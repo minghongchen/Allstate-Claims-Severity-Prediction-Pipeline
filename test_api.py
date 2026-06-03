@@ -22,5 +22,8 @@ resp = requests.post(
     timeout=300
 )
 
-print(resp.status_code)
+if resp.status_code == 200:
+    print('Test sucessful')
+else:
+    print('Test failed')
 print(resp.json())
