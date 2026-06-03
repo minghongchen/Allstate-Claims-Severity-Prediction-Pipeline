@@ -1,6 +1,6 @@
 # Operating system generated files
 .DS_Store
-.ipynb_checkpoints
+.ipynb_checkpoints/
 
 # virtual environment
 env/
@@ -10,8 +10,8 @@ __pycache__/
 .pytest_cache/
 
 # large pickle files
-models/feature_engineer_dict.pkl
-models/retrained/retrain_feature_engineer_dict.pkl
+#models/feature_engineer_dict.pkl
+#models/retrained/retrain_feature_engineer_dict.pkl
 
 # Data
 data/
