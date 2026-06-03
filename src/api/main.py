@@ -3,6 +3,7 @@
 """
 
 from fastapi import FastAPI
+from fastapi import HTTPException
 import pandas as pd
 from pathlib import Path
 import lightgbm as lgb

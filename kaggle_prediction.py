@@ -15,9 +15,11 @@ k_predictions = predict(input_df=k_test_df.drop(columns=["id"]))
 #plt.title('Loss prediction')
 #plt.show()
 
+
 res_df = pd.concat([k_test_df['id'], pd.Series(k_predictions, name='loss')], axis=1)
 print("Final Kaggle prediction: ")
 print(res_df.head())
+
 
 res_df.to_csv("kaggle_result.csv", index=False)
 

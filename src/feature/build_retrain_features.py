@@ -52,9 +52,9 @@ def build_retrain_features(
     # Onehot encoding
     full_train_df, test_df, onehot_enc = add_onehot_encoding(summary_cat_df=summary_cat_df, train_df=full_train_df, test_df=test_df)
     # Group stats
-    full_train_df, test_df, groups, cont_stats = add_group_stats(cat_cols=cat_cols, cont_cols=cont_cols, train_df=full_train_df, test_df=test_df)
+    full_train_df, test_df, group_stats_lookup, cont_stats = add_group_stats(cat_cols=cat_cols, cont_cols=cont_cols, train_df=full_train_df, test_df=test_df)
     # Numeric transformations
-    full_train_df, test_df, uniq, ranks, l, u = add_num_trans(cont_cols=cont_cols, train_df=full_train_df, test_df=test_df)
+    full_train_df, test_df, rank_params, winsor = add_num_trans(cont_cols=cont_cols, train_df=full_train_df, test_df=test_df)
     # log loss
     full_train_df, test_df = add_log_loss(train_df=full_train_df, test_df=test_df)
     
@@ -63,13 +63,12 @@ def build_retrain_features(
         "cat_counts": counts,
         "ordinal_encoder": ord_enc,
         "onehot_encoder": onehot_enc,
-        "groups": groups,
+        "group_stats_lookup": group_stats_lookup,
         "cont_stats": cont_stats,
-        "uniq": uniq,
-        "ranks": ranks,
-        "low_bound": l,
-        "up_bound": u
+        "rank_params": rank_params,
+        "winsor": winsor,
     }
+
     ret_modelpath = modelpath / "retrained"
     ret_modelpath.mkdir(parents=True, exist_ok=True)
     with (ret_modelpath / "retrain_feature_engineer_dict.pkl").open("wb") as f:

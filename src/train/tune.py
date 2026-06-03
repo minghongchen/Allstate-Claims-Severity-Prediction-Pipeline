@@ -24,7 +24,7 @@ def tune_model(
     model_path: Path | str = MODEL_DIR,
     mlflow_path: Path | str = MLFLOW_RESULT_DIR,
     seed: int = SEED,
-    n_trials: int = 30 
+    n_trials: int = 10, 
 ):
     """ Tune hyperparameters of LightGBM using valid split and save best set of parameters"""
 
@@ -32,6 +32,7 @@ def tune_model(
     propath = Path(pro_path)
     train_df = pd.read_parquet(propath / "transformed_train.parquet")
     valid_df = pd.read_parquet(propath / "transformed_valid.parquet")
+    print("Transformed data loaded")
 
     # Define target and features
     target = "log_loss"
@@ -96,6 +97,7 @@ def tune_model(
         return mae
 
     # Run Optuna study
+    print("Start Optuna study...")
     mlflow_path = Path(mlflow_path)
     mlflow_path.mkdir(parents=True, exist_ok=True)
     mlflow.set_tracking_uri(mlflow_path)

@@ -27,6 +27,7 @@ def retrain(
     # Load data
     train_df = pd.read_parquet(retpath / "final_transformed_train.parquet")
     test_df = pd.read_parquet(retpath / "final_transformed_test.parquet")
+    print("Transformed data loaded")
 
     # LightGBM settings
     X_train, Y_train = train_df.drop(columns=['loss', 'log_loss']), train_df['log_loss']
@@ -40,6 +41,7 @@ def retrain(
 
 
     # Train model
+    print("Start final LGB model retrain...")
     final_model = lgb.train(params, train_lgb, num_boost_round=num_boost_round)
 
     # Save final model

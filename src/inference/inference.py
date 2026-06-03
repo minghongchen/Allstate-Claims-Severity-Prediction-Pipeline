@@ -13,7 +13,6 @@ from pathlib import Path
 from sklearn.metrics import mean_absolute_error
 import pickle
 from src.config.paths import MODEL_DIR, PROCESSED_DATA_DIR
-from src.feature.eda_data_cleaning import drop_duplicates, drop_loss_outlier
 from src.feature.build_train_features import transform_rank
 
 
@@ -27,10 +26,8 @@ def predict(
     modelpath = Path(model_path)
     propath = Path(pro_path)
 
-    # 1. Preprocess input
-    input_df = drop_duplicates(input_df)
 
-    # 2. Add features and encodings
+    # Add features and encodings
     with open(modelpath / "retrained" / "retrain_feature_engineer_dict.pkl", "rb") as f:
         feature_dict = pickle.load(f)
 
@@ -57,20 +54,22 @@ def predict(
     input_df = pd.concat([input_df, input_onehot_df], axis=1)
 
     # Group stats
-    groups = feature_dict["groups"]
+    group_lookup = feature_dict["group_stats_lookup"]
     cont_stats = feature_dict["cont_stats"]
-    for cat, group in zip(cat_cols, groups):
+    for cat in cat_cols:
+        agg = group_lookup[cat]
         for cont in cont_cols:
-            global_mean, global_med, global_std = cont_stats[cont][0], cont_stats[cont][1], cont_stats[cont][2]
-            input_df[f'{cat}_{cont}_mean'] = input_df[cat].map(group[cont].mean()).fillna(global_mean)
-            input_df[f'{cat}_{cont}_med'] = input_df[cat].map(group[cont].median()).fillna(global_med)
-            input_df[f'{cat}_{cont}_std'] = input_df[cat].map(group[cont].std()).fillna(global_std)
+            gm, gmed, gstd = cont_stats[cont]
+            input_df[f'{cat}_{cont}_mean'] = input_df[cat].map(agg[(cont, 'mean')]).fillna(gm)
+            input_df[f'{cat}_{cont}_med'] = input_df[cat].map(agg[(cont, 'median')]).fillna(gmed)
+            input_df[f'{cat}_{cont}_std'] = input_df[cat].map(agg[(cont, 'std')]).fillna(gstd)
 
     # Numeric transformations
-    uniq = feature_dict["uniq"]
-    ranks = feature_dict["ranks"]
-    l, u = feature_dict["low_bound"], feature_dict["up_bound"]
+    rank_params = feature_dict["rank_params"]
+    winsor = feature_dict["winsor"]
     for cont in cont_cols:
+        uniq, ranks = rank_params[cont]
+        l, u = winsor[cont]
         # Log transform
         input_df[f'log_{cont}'] = np.log1p(input_df[cont])
         # Rank transform
@@ -79,8 +78,9 @@ def predict(
         input_df[f'{cont}_cap'] = input_df[cont].clip(l, u)
 
 
-    # 3. Predict
+    # Predict
     model = lgb.Booster(model_file = modelpath / "retrained"/ "final_lgb.txt")
+    #model = lgb.Booster(model_file = modelpath / "baseline"/ "baseline_lgb.txt")
     log_loss_pred = model.predict(input_df)
     loss_pred = np.exp(log_loss_pred)
 
@@ -90,7 +90,5 @@ def predict(
 
 
 
-if __name__ == "__main__":
-    predict()
     
 

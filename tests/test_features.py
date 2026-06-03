@@ -85,80 +85,132 @@ def test_summarize_cat(mock_pro_path) -> None:
 
 # build_train_features.py -- unit test
 def test_add_frequency_encoding() -> None:
-    train_df = pd.DataFrame({"cat": ["A","A","B"]})
-    valid_df = pd.DataFrame({"cat": ["A","C"]})
-    test_df = pd.DataFrame({"cat": ["A","C"]})
-    cat_cols = ["cat"]
+    train_df = pd.DataFrame({"cat1": ["A","A","B"], "cat2": ["X","Y","Y"]})
+    valid_df = pd.DataFrame({"cat1": ["A","C"], "cat2": ["X","Y"]})
+    test_df = pd.DataFrame({"cat1": ["A","C"], "cat2": ["X","X"]})
+    cat_cols = ["cat1", "cat2"]
     train_df, valid_df, test_df, counts = add_frequency_encoding(cat_cols, train_df, test_df, valid_df)
-    assert train_df["cat_freq"].to_list() == [2,2,1]
-    assert train_df["cat_log_freq"].to_list() == np.log1p([2,2,1]).tolist()
-    assert train_df["cat_norm_freq"].to_list() == [2/3, 2/3, 1/3]
-    assert valid_df["cat_freq"].to_list() == [2,0]
-    assert valid_df["cat_log_freq"].to_list() == np.log1p([2,0]).tolist()
-    assert valid_df["cat_norm_freq"].to_list() == [2/3, 0/3]
-    assert test_df["cat_freq"].to_list() == [2,0]
-    assert test_df["cat_log_freq"].to_list() == np.log1p([2,0]).tolist()
-    assert test_df["cat_norm_freq"].to_list() == [2/3, 0/3]
-    assert len(counts) == 1
-    pd.testing.assert_series_equal(counts[0], train_df["cat"].value_counts())
+    assert "cat1_freq" in train_df.columns
+    assert "cat2_freq" in train_df.columns
+    assert len(counts) == 2
+    assert train_df["cat1_freq"].to_list() == [2,2,1]
+    assert train_df["cat2_freq"].to_list() == [1,2,2]
+    assert valid_df["cat1_freq"].to_list() == [2,0]
+    assert valid_df["cat2_freq"].to_list() == [1,2]
+    assert test_df["cat1_freq"].to_list() == [2,0]
+    assert test_df["cat2_freq"].to_list() == [1,1]
+    pd.testing.assert_series_equal(counts[0], train_df["cat1"].value_counts())
+    pd.testing.assert_series_equal(counts[1], train_df["cat2"].value_counts())
     print("Adding frequency encoding features test passed")
 
 
 def test_ordinal_encoding() -> None:
-    train_df = pd.DataFrame({"cat": ["A","A","B"]})
-    valid_df = pd.DataFrame({"cat": ["A","C"]})
-    test_df = pd.DataFrame({"cat": ["B","C"]})
-    cat_cols = ["cat"]
+    train_df = pd.DataFrame({"cat1": ["A","A","B"], "cat2": ["X","Y","Y"]})
+    valid_df = pd.DataFrame({"cat1": ["A","C"], "cat2": ["X","Y"]})
+    test_df = pd.DataFrame({"cat1": ["B","C"], "cat2": ["X","Z"]})
+    cat_cols = ["cat1", "cat2"]
     train_df, valid_df, test_df, ord_encoder = add_ordinal_encoding(cat_cols, train_df, test_df, valid_df)
-    a_enc = train_df["cat"].to_list()[0]   # Encodings of "A"
-    b_enc = train_df["cat"].to_list()[2]   # Encodings of "B"
-    assert train_df["cat"].to_list() == [a_enc, a_enc, b_enc]
-    assert valid_df["cat"].to_list() == [a_enc, -1]
-    assert test_df["cat"].to_list() == [b_enc, -1]
+    a_enc = train_df["cat1"].to_list()[0]   # Encodings of "A"
+    b_enc = train_df["cat1"].to_list()[2]   # Encodings of "B"
+    x_enc = train_df["cat2"].to_list()[0]
+    y_enc = train_df["cat2"].to_list()[1]
+    assert train_df["cat1"].to_list() == [a_enc, a_enc, b_enc]
+    assert train_df["cat2"].to_list() == [x_enc, y_enc, y_enc]
+    assert valid_df["cat1"].to_list() == [a_enc, -1]
+    assert valid_df["cat2"].to_list() == [x_enc, y_enc]
+    assert test_df["cat1"].to_list() == [b_enc, -1]
+    assert test_df["cat2"].to_list() == [x_enc, -1]
     print("Ordinal encoding test passed")
 
 
 def test_add_onehot_encoding(tmp_path) -> None:
-    train_df = pd.DataFrame({"cat": ["A","A","B"]})
-    valid_df = pd.DataFrame({"cat": ["A","C"]})
-    test_df = pd.DataFrame({"cat": ["B","C"]})
+    train_df = pd.DataFrame({"cat1": ["A","A","B"], "cat2": ["X","Y","Y"]})
+    valid_df = pd.DataFrame({"cat1": ["A","C"], "cat2": ["X","Y"]})
+    test_df = pd.DataFrame({"cat1": ["B","C"], "cat2": ["X","X"]})
     summary_cat_df = summarize_cat(train_df, output_path=tmp_path)
     train_df, valid_df, test_df, ord_encoder = add_onehot_encoding(summary_cat_df, train_df, test_df, valid_df)
-    assert train_df["cat_A"].to_list() == [1,1,0]
-    assert train_df["cat_B"].to_list() == [0,0,1]
-    assert valid_df["cat_A"].to_list() == [1,0]
-    assert valid_df["cat_B"].to_list() == [0,0]
-    assert test_df["cat_A"].to_list() == [0,0]
-    assert test_df["cat_B"].to_list() == [1,0]
+    assert train_df["cat1_A"].to_list() == [1,1,0]
+    assert train_df["cat1_B"].to_list() == [0,0,1]
+    assert train_df["cat2_X"].to_list() == [1,0,0]
+    assert train_df["cat2_Y"].to_list() == [0,1,1]
+    assert valid_df["cat1_A"].to_list() == [1,0]
+    assert valid_df["cat1_B"].to_list() == [0,0]
+    assert valid_df["cat2_X"].to_list() == [1,0]
+    assert valid_df["cat2_Y"].to_list() == [0,1]
+    assert test_df["cat1_A"].to_list() == [0,0]
+    assert test_df["cat1_B"].to_list() == [1,0]
+    assert test_df["cat2_X"].to_list() == [1,1]
+    assert test_df["cat2_Y"].to_list() == [0,0]
     print("Onehot encoding test passed")
 
 
 def test_add_group_stats() -> None:
     train_df = pd.DataFrame({
-        "cat": ["A","A","B"],
-        "cont": [100, 200, 300]
+        "cat1": ["A","A","B"],
+        "cat2": ["X","Y","Y"],
+        "cont1": [100, 200, 300],
+        "cont2": [3, 4, 5],
     })
     valid_df = pd.DataFrame({
-        "cat": ["A","C"],
-        "cont": [400, 500]
+        "cat1": ["A","C"],
+        "cat2": ["X","Y"],
+        "cont1": [400, 500],
+        "cont2": [6, 7],
     })
     test_df = pd.DataFrame({
-        "cat": ["B","C"],
-        "cont": [600, 700]
+        "cat1": ["B","C"],
+        "cat2": ["X","X"],
+        "cont1": [600, 700],
+        "cont2": [8, 9],
     })
-    cat_cols, cont_cols = ["cat"], ["cont"]
+    cat_cols, cont_cols = ["cat1", "cat2"], ["cont1", "cont2"]
     train_df, valid_df, test_df, groups, global_stats = add_group_stats(cat_cols, cont_cols, train_df, test_df, valid_df)
     std_100_200 = pd.Series([100,200]).std()
+    std_200_300 = pd.Series([200,300]).std()
     std_100_200_300 = pd.Series([100,200,300]).std()
-    assert train_df["cat_cont_mean"].to_list() == [150, 150, 300]
-    assert train_df["cat_cont_med"].to_list() == [150, 150, 300]
-    assert train_df["cat_cont_std"].to_list() == [std_100_200, std_100_200, 0.0]
-    assert valid_df["cat_cont_mean"].to_list() == [150, 200]
-    assert valid_df["cat_cont_med"].to_list() == [150, 200]
-    assert valid_df["cat_cont_std"].to_list() == [std_100_200, std_100_200_300]
-    assert test_df["cat_cont_mean"].to_list() == [300, 200]
-    assert test_df["cat_cont_med"].to_list() == [300, 200]
-    assert test_df["cat_cont_std"].to_list() == [0.0, std_100_200_300]
+    std_3_4 = pd.Series([3,4]).std()
+    std_4_5 = pd.Series([4,5]).std()
+    std_3_4_5 = pd.Series([3,4,5]).std()
+
+    assert train_df["cat1_cont1_mean"].to_list() == [150, 150, 300]
+    assert train_df["cat1_cont1_med"].to_list() == [150, 150, 300]
+    assert train_df["cat1_cont1_std"].to_list() == [std_100_200, std_100_200, 0.0]
+    assert valid_df["cat1_cont1_mean"].to_list() == [150, 200]
+    assert valid_df["cat1_cont1_med"].to_list() == [150, 200]
+    assert valid_df["cat1_cont1_std"].to_list() == [std_100_200, std_100_200_300]
+    assert test_df["cat1_cont1_mean"].to_list() == [300, 200]
+    assert test_df["cat1_cont1_med"].to_list() == [300, 200]
+    assert test_df["cat1_cont1_std"].to_list() == [0.0, std_100_200_300]
+
+    assert train_df["cat1_cont2_mean"].to_list() == [3.5, 3.5, 5]
+    assert train_df["cat1_cont2_med"].to_list() == [3.5, 3.5, 5]
+    assert train_df["cat1_cont2_std"].to_list() == [std_3_4, std_3_4, 0.0]
+    assert valid_df["cat1_cont2_mean"].to_list() == [3.5, 4]
+    assert valid_df["cat1_cont2_med"].to_list() == [3.5, 4]
+    assert valid_df["cat1_cont2_std"].to_list() == [std_3_4, std_3_4_5]
+    assert test_df["cat1_cont2_mean"].to_list() == [5, 4]
+    assert test_df["cat1_cont2_med"].to_list() == [5, 4]
+    assert test_df["cat1_cont2_std"].to_list() == [0.0, std_3_4_5]
+
+    assert train_df["cat2_cont1_mean"].to_list() == [100, 250, 250]
+    assert train_df["cat2_cont1_med"].to_list() == [100, 250, 250]
+    assert train_df["cat2_cont1_std"].to_list() == [0.0, std_200_300, std_200_300]
+    assert valid_df["cat2_cont1_mean"].to_list() == [100, 250]
+    assert valid_df["cat2_cont1_med"].to_list() == [100, 250]
+    assert valid_df["cat2_cont1_std"].to_list() == [0.0, std_200_300]
+    assert test_df["cat2_cont1_mean"].to_list() == [100, 100]
+    assert test_df["cat2_cont1_med"].to_list() == [100, 100]
+    assert test_df["cat2_cont1_std"].to_list() == [0.0, 0.0]
+
+    assert train_df["cat2_cont2_mean"].to_list() == [3, 4.5, 4.5]
+    assert train_df["cat2_cont2_med"].to_list() == [3, 4.5, 4.5]
+    assert train_df["cat2_cont2_std"].to_list() == [0.0, std_4_5, std_4_5]
+    assert valid_df["cat2_cont2_mean"].to_list() == [3, 4.5]
+    assert valid_df["cat2_cont2_med"].to_list() == [3, 4.5]
+    assert valid_df["cat2_cont2_std"].to_list() == [0.0, std_4_5]
+    assert test_df["cat2_cont2_mean"].to_list() == [3, 3]
+    assert test_df["cat2_cont2_med"].to_list() == [3, 3]
+    assert test_df["cat2_cont2_std"].to_list() == [0.0, 0.0]
     print("Add group stats test passed")
 
 

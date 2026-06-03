@@ -23,6 +23,7 @@ def train_baseline(pro_path: Path | str = PROCESSED_DATA_DIR, model_path: Path |
     pro_path = Path(pro_path)
     train_df = pd.read_parquet(pro_path / "transformed_train.parquet")
     valid_df = pd.read_parquet(pro_path / "transformed_valid.parquet")
+    print("Read transformed training data")
 
     # Define target and features
     target = "log_loss"
@@ -55,6 +56,7 @@ def train_baseline(pro_path: Path | str = PROCESSED_DATA_DIR, model_path: Path |
 
 
     # Train model and save to out
+    print("Start training baseline LGB model...")
     model = lgb.train(
         lgbm_params,
         lgb_train,
@@ -78,7 +80,8 @@ def train_baseline(pro_path: Path | str = PROCESSED_DATA_DIR, model_path: Path |
 
 
 if __name__ == "__main__":
-    train_baseline()
+    base_model, mae = train_baseline()
+    print(f"Baseline MAE : {mae}")
 
 
 

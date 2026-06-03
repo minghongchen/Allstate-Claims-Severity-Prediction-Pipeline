@@ -38,10 +38,10 @@ def add_frequency_encoding(cat_cols: list[str], train_df: pd.DataFrame, test_df:
         test_df[f'{cat}_log_freq'] = np.log1p(test_df[f'{cat}_freq'])     # take log to compress extreme counts
         test_df[f'{cat}_norm_freq'] = test_df[f'{cat}_freq'] / len(train_df)
 
-        if valid_df is not None:
-            return train_df, valid_df, test_df, counts
-        else:
-            return train_df, test_df, counts
+    if valid_df is not None:
+        return train_df, valid_df, test_df, counts
+    else:
+        return train_df, test_df, counts
 
 
 
@@ -90,7 +90,6 @@ def add_onehot_encoding(summary_cat_df: pd.DataFrame, train_df: pd.DataFrame, te
 
 
 def add_group_stats(cat_cols: list[str], cont_cols: list[str], train_df: pd.DataFrame, test_df: pd.DataFrame, valid_df: pd.DataFrame | None = None):
-    groups = []
 
     # Calculate global stats for unseen categories imputation
     global_stats = {}
@@ -100,28 +99,36 @@ def add_group_stats(cat_cols: list[str], cont_cols: list[str], train_df: pd.Data
             cont_std = 0.0
         global_stats[cont] = (train_df[cont].mean(), train_df[cont].median(), cont_std)
 
+    lookup: dict[str, pd.DataFrame] = {}
     for cat in cat_cols:
-        group = train_df.groupby(cat)
-        groups.append(group)
+        agg = train_df.groupby(cat)[cont_cols].agg(['mean', 'median', 'std'])
+        agg = agg.fillna(0.0)
+        lookup[cat] = agg
+
         for cont in cont_cols:
-            train_df[f'{cat}_{cont}_mean'] = train_df[cat].map(group[cont].mean())
-            test_df[f'{cat}_{cont}_mean'] = test_df[cat].map(group[cont].mean()).fillna(global_stats[cont][0])
+            mean_s = agg[(cont, 'mean')]
+            med_s = agg[(cont, 'median')]
+            std_s = agg[(cont, 'std')]
+            gm, gmed, gstd = global_stats[cont]
 
-            train_df[f'{cat}_{cont}_med'] = train_df[cat].map(group[cont].median())
-            test_df[f'{cat}_{cont}_med'] = test_df[cat].map(group[cont].median()).fillna(global_stats[cont][1])
+            train_df[f'{cat}_{cont}_mean'] = train_df[cat].map(mean_s)
+            test_df[f'{cat}_{cont}_mean'] = test_df[cat].map(mean_s).fillna(gm)
 
-            train_df[f'{cat}_{cont}_std'] = train_df[cat].map(group[cont].std().fillna(0.0))
-            test_df[f'{cat}_{cont}_std'] = test_df[cat].map(group[cont].std().fillna(0.0)).fillna(global_stats[cont][2])
+            train_df[f'{cat}_{cont}_med'] = train_df[cat].map(med_s)
+            test_df[f'{cat}_{cont}_med'] = test_df[cat].map(med_s).fillna(gmed)
+
+            train_df[f'{cat}_{cont}_std'] = train_df[cat].map(std_s)
+            test_df[f'{cat}_{cont}_std'] = test_df[cat].map(std_s).fillna(gstd)
 
             if valid_df is not None:
-                valid_df[f'{cat}_{cont}_mean'] = valid_df[cat].map(group[cont].mean()).fillna(global_stats[cont][0])
-                valid_df[f'{cat}_{cont}_med'] = valid_df[cat].map(group[cont].median()).fillna(global_stats[cont][1])
-                valid_df[f'{cat}_{cont}_std'] = valid_df[cat].map(group[cont].std()).fillna(global_stats[cont][2])
+                valid_df[f'{cat}_{cont}_mean'] = valid_df[cat].map(mean_s).fillna(gm)
+                valid_df[f'{cat}_{cont}_med'] = valid_df[cat].map(med_s).fillna(gmed)
+                valid_df[f'{cat}_{cont}_std'] = valid_df[cat].map(std_s).fillna(gstd) 
 
     if valid_df is not None:
-        return train_df, valid_df, test_df, groups, global_stats
+        return train_df, valid_df, test_df, lookup, global_stats
     else:
-        return train_df, test_df, groups, global_stats
+        return train_df, test_df, lookup, global_stats
 
 
 
@@ -145,6 +152,8 @@ def fit_winsor(df, col):
 
 
 def add_num_trans(cont_cols: list[str], train_df: pd.DataFrame, test_df: pd.DataFrame, valid_df: pd.DataFrame | None = None):
+    rank_params, winsor = {}, {}
+
     for cont in cont_cols:
         # Log transform
         train_df[f'log_{cont}'] = np.log1p(train_df[cont])
@@ -152,11 +161,13 @@ def add_num_trans(cont_cols: list[str], train_df: pd.DataFrame, test_df: pd.Data
 
         # Rank transform
         uniq, ranks = fit_rank_transform(train_df, cont)
+        rank_params[cont] = (uniq, ranks)
         train_df[f'{cont}_rank'] = transform_rank(train_df[cont], uniq, ranks)
         test_df[f'{cont}_rank'] = transform_rank(test_df[cont], uniq, ranks)
 
         # Winsorization
         l, u = fit_winsor(train_df, cont)
+        winsor[cont] = (l,u)
         train_df[f'{cont}_cap'] = train_df[cont].clip(l, u)
         test_df[f'{cont}_cap'] = test_df[cont].clip(l, u)
 
@@ -166,9 +177,9 @@ def add_num_trans(cont_cols: list[str], train_df: pd.DataFrame, test_df: pd.Data
             valid_df[f'{cont}_cap'] = valid_df[cont].clip(l, u)
 
     if valid_df is not None:
-        return train_df, valid_df, test_df, uniq, ranks, l, u
+        return train_df, valid_df, test_df, rank_params, winsor
     else:
-        return train_df, test_df, uniq, ranks, l, u
+        return train_df, test_df, rank_params, winsor
 
 
 
@@ -213,9 +224,9 @@ def build_train_features(
     # Onehot encoding
     train_df, valid_df, test_df, onehot_enc = add_onehot_encoding(summary_cat_df=summary_cat_df, train_df=train_df, test_df=test_df, valid_df=valid_df)
     # Group stats
-    train_df, valid_df, test_df, groups, cont_stats = add_group_stats(cat_cols=cat_cols, cont_cols=cont_cols, train_df=train_df, test_df=test_df, valid_df=valid_df)
+    train_df, valid_df, test_df, group_stats_lookup, cont_stats = add_group_stats(cat_cols=cat_cols, cont_cols=cont_cols, train_df=train_df, test_df=test_df, valid_df=valid_df)
     # Numeric transformations
-    train_df, valid_df, test_df, uniq, ranks, l, u = add_num_trans(cont_cols=cont_cols, train_df=train_df, test_df=test_df, valid_df=valid_df)
+    train_df, valid_df, test_df, rank_params, winsor = add_num_trans(cont_cols=cont_cols, train_df=train_df, test_df=test_df, valid_df=valid_df)
     # log loss
     train_df, valid_df, test_df = add_log_loss(train_df=train_df, test_df=test_df, valid_df=valid_df)
     
@@ -224,12 +235,10 @@ def build_train_features(
         "cat_counts": counts,
         "ordinal_encoder": ord_enc,
         "onehot_encoder": onehot_enc,
-        "groups": groups,
+        "group_stats_lookup": group_stats_lookup,
         "cont_stats": cont_stats,
-        "uniq": uniq,
-        "ranks": ranks,
-        "low_bound": l,
-        "up_bound": u
+        "rank_params": rank_params,
+        "winsor": winsor,
     }
     with (modelpath / "feature_engineer_dict.pkl").open("wb") as f:
         pickle.dump(feature_engineer_dict, f)
