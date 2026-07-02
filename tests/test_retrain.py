@@ -104,7 +104,7 @@ def test_retrain_pipeline(mock_pro_path, mock_ret_path, mock_model_path) -> None
         model_path=mock_model_path
     )
 
-    final_model = retrain(ret_path=mock_ret_path, model_path=mock_model_path)
+    final_model, _, _ = retrain(ret_path=mock_ret_path, model_path=mock_model_path)
 
     assert (mock_model_path / "retrained" / "final_lgb.txt").exists()
 

@@ -84,7 +84,7 @@ def tune_and_retrain():
         model_path=mock_model_path
     )
 
-    final_model = retrain(ret_path=mock_ret_path, model_path=mock_model_path)
+    final_model, _, _ = retrain(ret_path=mock_ret_path, model_path=mock_model_path)
 
 
 
@@ -122,7 +122,7 @@ def test_predict(mock_pro_path, mock_ret_path, mock_model_path) -> None:
         ret_path=mock_ret_path,
         model_path=mock_model_path
     )
-    final_model = retrain(ret_path=mock_ret_path, model_path=mock_model_path)
+    final_model, _, _ = retrain(ret_path=mock_ret_path, model_path=mock_model_path)
 
     # predict
     sample_df = pd.DataFrame({
